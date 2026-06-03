@@ -19,7 +19,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({
             CategoryNotFoundException.class,
             TransactionNotFoundException.class,
-            SavingsGoalNotFoundException.class
+            SavingsGoalNotFoundException.class,
+            BudgetNotFoundException.class
     })
     public ResponseEntity<ApiErrorResponse> handleNotFound(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -30,7 +31,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({
             CategoryAlreadyExistsException.class,
             CategoryInUseException.class,
-            UserAlreadyExistsException.class
+            UserAlreadyExistsException.class,
+            BudgetAlreadyExistsException.class
     })
     public ResponseEntity<ApiErrorResponse> handleConflict(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -43,7 +45,8 @@ public class GlobalExceptionHandler {
             InvalidTransactionDateException.class,
             CategoryTypeMismatchException.class,
             InvalidSavingsGoalAmountException.class,
-            SavingsGoalAlreadyCompletedException.class
+            SavingsGoalAlreadyCompletedException.class,
+            BudgetCategoryTypeMismatchException.class
     })
     public ResponseEntity<ApiErrorResponse> handleBadRequest(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)

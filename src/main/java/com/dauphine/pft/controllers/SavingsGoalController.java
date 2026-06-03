@@ -1,8 +1,11 @@
 package com.dauphine.pft.controllers;
 
+import com.dauphine.pft.dto.requests.SavingsGoalContributionRequest;
 import com.dauphine.pft.dto.requests.SavingsGoalRequest;
 import com.dauphine.pft.dto.requests.UpdateSavingsGoalProgressRequest;
+import com.dauphine.pft.dto.responses.SavingsGoalContributionResponse;
 import com.dauphine.pft.dto.responses.SavingsGoalResponse;
+import com.dauphine.pft.mappers.SavingsGoalContributionMapper;
 import com.dauphine.pft.mappers.SavingsGoalMapper;
 import com.dauphine.pft.models.SavingsGoalStatus;
 import com.dauphine.pft.security.SecurityUtils;
@@ -29,11 +32,13 @@ public class SavingsGoalController {
 
     private final SavingsGoalService savingsGoalService;
     private final SavingsGoalMapper savingsGoalMapper;
+    private final SavingsGoalContributionMapper savingsGoalContributionMapper;
 
     private UUID CURRENT_USER_ID() {
         return SecurityUtils.getCurrentUserId();
     }
-    // UC-G04 — Get all + filtres
+
+    // UC-G04 - Get all + filters
     @GetMapping
     @Operation(
             summary = "Get all savings goals",
@@ -59,7 +64,6 @@ public class SavingsGoalController {
             @Parameter(description = "Filter by deadline after date (yyyy-MM-dd)")
             @RequestParam(name = "deadline-after", required = false) LocalDate deadlineAfter) {
 
-        // Marquer automatiquement les objectifs expirés comme FAILED à chaque consultation
         savingsGoalService.markOverdueAsFailed(CURRENT_USER_ID());
 
         List<SavingsGoalResponse> goals = savingsGoalService
@@ -70,13 +74,12 @@ public class SavingsGoalController {
         return ResponseEntity.ok(goals);
     }
 
-    // UC-G05 — Get by id
+    // UC-G05 - Get by id
     @GetMapping("/{id}")
     @Operation(summary = "Get savings goal by ID")
     public ResponseEntity<SavingsGoalResponse> getById(
             @Parameter(description = "Savings goal UUID") @PathVariable UUID id) {
 
-        // Vérifier aussi si cet objectif précis est expiré
         savingsGoalService.markOverdueAsFailed(CURRENT_USER_ID());
 
         return ResponseEntity.ok(
@@ -84,7 +87,7 @@ public class SavingsGoalController {
                         savingsGoalService.getByIdAndUser(id, CURRENT_USER_ID())));
     }
 
-    // UC-G01 — Create
+    // UC-G01 - Create
     @PostMapping
     @Operation(
             summary = "Create a new savings goal",
@@ -107,7 +110,7 @@ public class SavingsGoalController {
                 .body(response);
     }
 
-    // UC-G02 — Update
+    // UC-G02 - Update
     @PutMapping("/{id}")
     @Operation(
             summary = "Update a savings goal",
@@ -130,7 +133,7 @@ public class SavingsGoalController {
                                 request.getStatus())));
     }
 
-    // UC-G06 — Update progress only
+    // UC-G06 - Update progress only
     @PatchMapping("/{id}/progress")
     @Operation(
             summary = "Add amount to savings goal progress",
@@ -148,7 +151,41 @@ public class SavingsGoalController {
                                 request.getCurrentAmount())));
     }
 
-    // UC-G03 — Delete
+    @GetMapping("/{id}/contributions")
+    @Operation(summary = "Get savings goal contributions")
+    public ResponseEntity<List<SavingsGoalContributionResponse>> getContributions(
+            @Parameter(description = "Savings goal UUID") @PathVariable UUID id) {
+        List<SavingsGoalContributionResponse> contributions = savingsGoalService
+                .getContributions(id, CURRENT_USER_ID())
+                .stream()
+                .map(savingsGoalContributionMapper::toResponse)
+                .toList();
+
+        return ResponseEntity.ok(contributions);
+    }
+
+    @PostMapping("/{id}/contributions")
+    @Operation(
+            summary = "Add a contribution to a savings goal",
+            description = "Creates a contribution and increments currentAmount. " +
+                    "Automatically marks the goal as COMPLETED when targetAmount is reached.")
+    public ResponseEntity<SavingsGoalContributionResponse> contribute(
+            @Parameter(description = "Savings goal UUID") @PathVariable UUID id,
+            @Valid @RequestBody SavingsGoalContributionRequest request) {
+        SavingsGoalContributionResponse response = savingsGoalContributionMapper.toResponse(
+                savingsGoalService.contribute(
+                        id,
+                        CURRENT_USER_ID(),
+                        request.getAmount(),
+                        request.getDate(),
+                        request.getNote()));
+
+        return ResponseEntity
+                .created(URI.create("/v1/savings-goals/" + id + "/contributions/" + response.getId()))
+                .body(response);
+    }
+
+    // UC-G03 - Delete
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete a savings goal")
     public ResponseEntity<Void> delete(

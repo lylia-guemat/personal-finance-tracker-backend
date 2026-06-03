@@ -3,11 +3,14 @@ package com.dauphine.pft.services;
 import com.dauphine.pft.exceptions.*;
 import com.dauphine.pft.models.AppUser;
 import com.dauphine.pft.models.SavingsGoal;
+import com.dauphine.pft.models.SavingsGoalContribution;
 import com.dauphine.pft.models.SavingsGoalStatus;
 import com.dauphine.pft.repositories.AppUserRepository;
+import com.dauphine.pft.repositories.SavingsGoalContributionRepository;
 import com.dauphine.pft.repositories.SavingsGoalRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -19,6 +22,7 @@ import java.util.UUID;
 public class SavingsGoalServiceImpl implements SavingsGoalService {
 
     private final SavingsGoalRepository savingsGoalRepository;
+    private final SavingsGoalContributionRepository savingsGoalContributionRepository;
     private final AppUserRepository appUserRepository;
 
     // UC-G04
@@ -161,6 +165,47 @@ public class SavingsGoalServiceImpl implements SavingsGoalService {
         }
 
         return savingsGoalRepository.save(goal);
+    }
+
+    @Override
+    public List<SavingsGoalContribution> getContributions(UUID goalId, UUID userId) {
+        getByIdAndUser(goalId, userId);
+        return savingsGoalContributionRepository.findByGoalIdAndGoalUserIdOrderByDateDescCreatedAtDesc(goalId, userId);
+    }
+
+    @Override
+    @Transactional
+    public SavingsGoalContribution contribute(UUID goalId, UUID userId, BigDecimal amount, LocalDate date, String note) {
+        SavingsGoal goal = savingsGoalRepository.findByIdAndUserId(goalId, userId)
+                .orElseThrow(() -> new SavingsGoalNotFoundException(goalId));
+
+        if (goal.getStatus() == SavingsGoalStatus.COMPLETED) {
+            throw new SavingsGoalAlreadyCompletedException(goalId);
+        }
+
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidSavingsGoalAmountException();
+        }
+
+        BigDecimal newAmount = goal.getCurrentAmount().add(amount);
+
+        if (newAmount.compareTo(goal.getTargetAmount()) > 0) {
+            throw new InvalidSavingsGoalAmountException();
+        }
+
+        SavingsGoalContribution contribution = new SavingsGoalContribution();
+        contribution.setGoal(goal);
+        contribution.setAmount(amount);
+        contribution.setDate(date);
+        contribution.setNote(note);
+
+        goal.setCurrentAmount(newAmount);
+        if (newAmount.compareTo(goal.getTargetAmount()) >= 0) {
+            goal.setStatus(SavingsGoalStatus.COMPLETED);
+        }
+
+        savingsGoalRepository.save(goal);
+        return savingsGoalContributionRepository.save(contribution);
     }
 
     // UC-G03

@@ -166,6 +166,22 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             @Param("endDate") LocalDate endDate
     );
 
+    @Query("""
+        SELECT COALESCE(SUM(t.amount), 0)
+        FROM Transaction t
+        WHERE t.user.id = :userId
+        AND t.category.id = :categoryId
+        AND t.type = com.dauphine.pft.models.TransactionType.EXPENSE
+        AND t.transactionDate >= :startDate
+        AND t.transactionDate <= :endDate
+    """)
+    BigDecimal sumExpensesByUserAndCategoryBetween(
+            @Param("userId") UUID userId,
+            @Param("categoryId") UUID categoryId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
     // Nombre de transactions par mois
     @Query(value = """
     SELECT COUNT(*)
